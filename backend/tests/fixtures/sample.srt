@@ -1,0 +1,7 @@
+1
+00:00:01,000 --> 00:00:02,500
+Welcome to SubLynt.
+
+2
+00:00:02,450 --> 00:00:03,000
+This cue overlaps and is brief.
