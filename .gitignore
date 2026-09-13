@@ -15,3 +15,11 @@ frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 .DS_Store
+
+# Local deployment notes and temporary authentication files
+/.private/
+gha-creds-*.json
+/firebase.json
+/.firebase/
+/firebase-debug.log
+/firepit-log.txt

@@ -6,3 +6,6 @@ __pycache__
 tests
 data
 *.pyc
+.coverage
+.env
+gha-creds-*.json

@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db.database import get_db
 from app.db.models import FileJob
 from app.schemas import JobResponse, PreviewResponse, TransformRequest, TransformResponse
+from app.services.cloud_jobs import CloudJobService
 from app.services.jobs import JobNotFoundError, JobService, report, safe_download_name
 from sublynt_core.models import Cue, SubtitleDocument
 
@@ -21,6 +23,8 @@ def service_dependency(
     session: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> JobService:
+    if settings.storage_bucket:
+        return CloudJobService(settings)
     return JobService(session, settings)
 
 
@@ -126,7 +130,7 @@ def preview_file(file_id: str, service: Service) -> PreviewResponse:
 
 
 @router.get("/files/{file_id}/download", summary="Download the corrected subtitle")
-def download_file(file_id: str, service: Service) -> FileResponse:
+def download_file(file_id: str, service: Service) -> Response:
     job = _job(service, file_id)
     document = service.generated_document(job)
     if document is None or not job.generated_path or not job.output_format:
@@ -137,10 +141,11 @@ def download_file(file_id: str, service: Service) -> FileResponse:
                 "message": "Apply a transformation before downloading.",
             },
         )
-    return FileResponse(
-        service._contained(job.generated_path),
+    filename = quote(safe_download_name(job.original_name, job.output_format))
+    return Response(
+        service.read_text(job.generated_path),
         media_type="text/vtt" if job.output_format == "vtt" else "application/x-subrip",
-        filename=safe_download_name(job.original_name, job.output_format),
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
     )
 
 
@@ -148,7 +153,6 @@ def download_file(file_id: str, service: Service) -> FileResponse:
     "/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a subtitle job"
 )
 def delete_file(file_id: str, service: Service) -> Response:
-    job = service.session.get(FileJob, file_id)
-    if job is not None:
-        service.delete(job)
+    with suppress(JobNotFoundError):
+        service.delete(service.get(file_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)

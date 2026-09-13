@@ -55,16 +55,30 @@ class JobService:
         parse_subtitle(text, fmt)
         file_id = str(uuid4())
         path = self.root / f"{file_id}.source.{fmt.value}"
-        path.write_text(text, encoding="utf-8", newline="\n")
+        self.write_text(str(path), text)
         job = FileJob(
             id=file_id,
             original_name=Path(filename.replace("\\", "/")).name[:255] or f"upload.{fmt.value}",
             source_format=fmt.value,
             source_path=str(path),
+            created_at=datetime.now(UTC),
+            changes_json="[]",
         )
+        self.save(job)
+        return job
+
+    def save(self, job: FileJob) -> None:
         self.session.add(job)
         self.session.commit()
-        return job
+
+    def read_text(self, raw_path: str) -> str:
+        return self._contained(raw_path).read_text(encoding="utf-8")
+
+    def write_text(self, raw_path: str, text: str) -> None:
+        self._contained(raw_path).write_text(text, encoding="utf-8", newline="\n")
+
+    def remove_file(self, raw_path: str) -> None:
+        self._contained(raw_path).unlink(missing_ok=True)
 
     def get(self, file_id: str) -> FileJob:
         job = self.session.get(FileJob, file_id)
@@ -73,16 +87,16 @@ class JobService:
         return job
 
     def source_document(self, job: FileJob) -> SubtitleDocument:
-        path = self._contained(job.source_path)
-        return parse_subtitle(path.read_text(encoding="utf-8"), SubtitleFormat(job.source_format))
+        return parse_subtitle(self.read_text(job.source_path), SubtitleFormat(job.source_format))
 
     def generated_document(self, job: FileJob) -> SubtitleDocument | None:
         if not job.generated_path or not job.output_format:
             return None
-        path = self._contained(job.generated_path)
-        if not path.exists():
+        try:
+            text = self.read_text(job.generated_path)
+        except FileNotFoundError:
             return None
-        return parse_subtitle(path.read_text(encoding="utf-8"), SubtitleFormat(job.output_format))
+        return parse_subtitle(text, SubtitleFormat(job.output_format))
 
     def apply_transform(
         self, job: FileJob, request: TransformRequest
@@ -114,21 +128,20 @@ class JobService:
         # Round-trip validation is mandatory before replacing a generated artifact.
         parse_subtitle(serialized, transformed.format)
         path = self.root / f"{job.id}.generated.{transformed.format.value}"
-        path.write_text(serialized, encoding="utf-8", newline="\n")
+        self.write_text(str(path), serialized)
         if job.generated_path and job.generated_path != str(path):
-            old_path = self._contained(job.generated_path)
-            old_path.unlink(missing_ok=True)
+            self.remove_file(job.generated_path)
         changes = [change.as_dict() for change in raw_changes]
         job.generated_path = str(path)
         job.output_format = transformed.format.value
         job.changes_json = json.dumps(changes)
-        self.session.commit()
+        self.save(job)
         return transformed, changes
 
     def delete(self, job: FileJob) -> None:
         for raw_path in (job.source_path, job.generated_path):
             if raw_path:
-                self._contained(raw_path).unlink(missing_ok=True)
+                self.remove_file(raw_path)
         self.session.delete(job)
         self.session.commit()
 

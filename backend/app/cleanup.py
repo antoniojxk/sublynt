@@ -4,6 +4,9 @@ from app.services.jobs import JobService
 
 
 def main() -> None:
+    if get_settings().storage_bucket:
+        print("Cloud Storage lifecycle manages expired job deletion.")
+        return
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         count = JobService(session, get_settings()).cleanup_expired()
