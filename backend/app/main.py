@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.api.routes import router
 from app.core.config import get_settings
 from app.db.database import Base, SessionLocal, engine
+from app.services.cloud_jobs import JobConflictError
 from app.services.jobs import JobService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -33,6 +34,9 @@ async def cleanup_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    if settings.storage_bucket:
+        yield
+        return
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
@@ -62,6 +66,23 @@ app.add_middleware(
     allow_headers=["Content-Type", "Accept"],
 )
 app.include_router(router)
+
+
+@app.middleware("http")
+async def private_responses(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.exception_handler(JobConflictError)
+async def job_conflict(_: Request, exc: JobConflictError) -> JSONResponse:
+    return JSONResponse(
+        status_code=409, content={"error": {"code": "conflict", "message": str(exc)}}
+    )
 
 
 @app.get("/health", tags=["system"])

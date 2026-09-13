@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=5 * 1024 * 1024, ge=1024)
     retention_hours: int = Field(default=24, ge=1)
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    storage_bucket: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:

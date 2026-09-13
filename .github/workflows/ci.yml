@@ -3,6 +3,10 @@ name: CI
 on:
   push:
   pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -38,3 +42,56 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - name: Validate Hosting configuration
+        run: npm run build:hosting
+        env:
+          VITE_API_URL: https://api.example.com/api/v1
+
+  deploy:
+    needs: [backend, frontend]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: firebase-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm install --global firebase-tools@15.29.0
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.FIREBASE_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Build and deploy API
+        run: |
+          gcloud auth configure-docker "$GCP_REGION-docker.pkg.dev" --quiet
+          export IMAGE="$GCP_REGION-docker.pkg.dev/$GCP_BACKEND_PROJECT_ID/sublynt/api:$GITHUB_SHA"
+          docker build --platform linux/amd64 --tag "$IMAGE" backend
+          docker push "$IMAGE"
+          bash scripts/deploy-backend.sh
+        env:
+          GCP_BACKEND_PROJECT_ID: ${{ vars.GCP_BACKEND_PROJECT_ID }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          SUBLYNT_STORAGE_BUCKET: ${{ vars.SUBLYNT_STORAGE_BUCKET }}
+          GCP_RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+      - name: Build Hosting frontend
+        run: npm run build:hosting --prefix frontend
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+      - name: Deploy production
+        if: github.event_name == 'push'
+        run: firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --non-interactive
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}

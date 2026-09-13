@@ -79,6 +79,8 @@ For local Vite development, its proxy expects the backend at `http://localhost:8
 
 ## Configuration
 
+For production Firebase Hosting and Cloud Run setup, see [Firebase deployments](docs/firebase-deployment.md).
+
 Backend settings are environment variables prefixed by `SUBLYNT_`:
 
 | Variable | Default | Purpose |
