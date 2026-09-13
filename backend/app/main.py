@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 
 from app.api.routes import router
 from app.core.config import get_settings
+from app.core.demo_guard import DemoGuard, DemoRequestMiddleware
 from app.db.database import Base, SessionLocal, engine
 from app.services.cloud_jobs import JobConflictError
 from app.services.jobs import JobService
@@ -58,6 +59,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 settings = get_settings()
+app.state.demo_guard = DemoGuard(settings)
+app.add_middleware(DemoRequestMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

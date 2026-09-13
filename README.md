@@ -143,7 +143,7 @@ Splitting prefers sentence boundaries, then punctuation, then words; only an unb
 - CORS is explicit, nginx sets a restrictive content policy and security headers, internal exceptions/paths are not returned, and logs contain metadata only.
 - There is no archive handling, content execution, remote fetch, or user-controlled path construction.
 
-For internet-facing deployment, put the service behind a trusted reverse proxy with TLS, request timeouts, body limits, and rate limiting. Application-level rate limiting is intentionally omitted because correct enforcement belongs in the shared ingress when the API is horizontally scaled.
+For internet-facing deployment, put the service behind a trusted reverse proxy with TLS, request timeouts, body limits, and rate limiting. The production demo enables bounded application-level request limits for its single-instance deployment; a horizontally scaled deployment should enforce limits in shared ingress or storage. See the deployment guide for the limits and their billing limitations.
 
 ## Verification
 

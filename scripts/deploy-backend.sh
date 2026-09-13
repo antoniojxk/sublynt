@@ -13,6 +13,6 @@ gcloud run deploy sublynt-api \
   --image="$IMAGE" \
   --service-account="$GCP_RUNTIME_SERVICE_ACCOUNT" \
   --port=8080 --cpu=1 --memory=512Mi \
-  --min=0 --max=1 --concurrency=4 --timeout=60 \
-  --set-env-vars="^|^SUBLYNT_ENVIRONMENT=production|SUBLYNT_STORAGE_BUCKET=$SUBLYNT_STORAGE_BUCKET|SUBLYNT_RETENTION_HOURS=24|SUBLYNT_CORS_ORIGINS=https://sublynt.web.app,https://sublynt.firebaseapp.com" \
+  --min=0 --max=1 --concurrency=1 --timeout=60 \
+  --set-env-vars="^|^SUBLYNT_ENVIRONMENT=production|SUBLYNT_STORAGE_BUCKET=$SUBLYNT_STORAGE_BUCKET|SUBLYNT_RETENTION_HOURS=24|SUBLYNT_DEMO_LIMITS_ENABLED=true|SUBLYNT_CORS_ORIGINS=https://sublynt.web.app,https://sublynt.firebaseapp.com" \
   --quiet
