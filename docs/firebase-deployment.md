@@ -4,6 +4,11 @@ Pushes to `main` deploy the Python API to Cloud Run and the React frontend to
 Firebase Hosting after the `backend` and `frontend` CI checks pass. Pull requests
 run validation only. There are no preview environments.
 
+The frontend uses site `sublynt` in Firebase project `nuvorima`. The API runs as
+`sublynt-api` in project `invoiceparse-java`, region `northamerica-northeast2`,
+with private bucket `sublynt-production-982607010629` and Artifact Registry
+repository `sublynt`. These are separate from the existing InvoiceParse service.
+
 Hosting explicitly targets site `sublynt`. `npm run build:hosting --prefix frontend`
 generates its configuration, including SPA routing, security headers, API-specific
 CSP and immutable caching for hashed assets. Generated configuration is ignored.
@@ -53,8 +58,8 @@ There are no service-account keys. Firebase Hosting permissions are project-wide
 the Hosting manifest explicitly targets Sublynt, but that is not an IAM boundary.
 
 The deployment account needs Hosting Admin and Service Usage Consumer in the
-Hosting project, Cloud Run Developer and Service Usage Consumer in the backend
-project, Artifact Registry Writer on the Sublynt repository, and Service Account
+Hosting project, Cloud Run Developer on the Sublynt service and Service Usage
+Consumer in the backend project, Artifact Registry Writer on the Sublynt repository, and Service Account
 User on the Sublynt runtime account. Initial public invocation is configured by
 the owner; CI updates the existing service without managing its IAM policy.
 
